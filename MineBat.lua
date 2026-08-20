@@ -1,5 +1,5 @@
 -- =========================================================
--- MINEBAT SILENT AIM v2.0 (Телефон + Меню)
+-- MINEBAT SILENT AIM v3.0 (Меню + Клавиша V)
 -- =========================================================
 
 local Players = game:GetService("Players")
@@ -47,7 +47,7 @@ local function notif(text)
 end
 
 -- =========================================================
--- МЕНЮ ДЛЯ ТЕЛЕФОНА
+-- МЕНЮ
 -- =========================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = playerGui
@@ -103,7 +103,7 @@ local function CreateToggle(yPos, label, callback)
 end
 
 -- =========================================================
--- ЛОГИКА ПЕРСОНАЖА И ОРУЖИЯ
+-- ЛОГИКА ПЕРСОНАЖА
 -- =========================================================
 
 local function bind(char)
@@ -263,7 +263,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- =========================================================
--- КНОПКИ МЕНЮ (Включение/Выключение)
+-- КНОПКА МЕНЮ
 -- =========================================================
 CreateToggle(50, "Silent Aim (ON/OFF)", function(state)
     enabled = state
@@ -271,7 +271,19 @@ CreateToggle(50, "Silent Aim (ON/OFF)", function(state)
 end)
 
 -- =========================================================
--- СКРЫТИЕ МЕНЮ ПО ТАПУ НА ЗАГОЛОВОК
+-- КЛАВИША V (ДЛЯ ПК / КЛАВИАТУРЫ)
+-- =========================================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Enum.KeyCode.V then
+        enabled = not enabled
+        notif(enabled and "Enabled (V)" or "Disabled (V)")
+    end
+end)
+
+-- =========================================================
+-- СВОРАЧИВАНИЕ МЕНЮ ПО ТАПУ НА ЗАГОЛОВОК
 -- =========================================================
 local isCollapsed = false
 Title.InputBegan:Connect(function(input)
@@ -284,4 +296,4 @@ Title.InputBegan:Connect(function(input)
     end
 end)
 
-notif("Loaded! Use Menu to Toggle.")
+notif("Loaded! V to toggle / Use Menu.")
