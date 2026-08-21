@@ -1,48 +1,43 @@
 -- =========================================================
--- MINEBAT SILENT AIM v3.0 (Меню + Клавиша V)
+-- MINEBAT MC-STYLE v3.0 (12 функций)
 -- =========================================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
-local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
-local attack = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Attack")
 
-local character, humanoid, root, camera
-local jumpConn, charConn
-local jumped, jumpAt = false, 0
-local enabled = true
-local radius = 170
-local fallY = -1.5
-local lastScan, lastSwing, currentTool = 0, 0, nil
+-- Настройки
+local reachDistance = 15
+local speedMultiplier = 2.5
+local jumpPower = 80
 
-local corners = {
-    Vector3.new(-1,-1,-1), Vector3.new(-1,-1,1),
-    Vector3.new(-1,1,-1), Vector3.new(-1,1,1),
-    Vector3.new(1,-1,-1), Vector3.new(1,-1,1),
-    Vector3.new(1,1,-1), Vector3.new(1,1,1)
+local enabled = {
+    killAura = false,
+    silentAim = false,
+    velocity = false,
+    speed = false,
+    jump = false,
+    infJump = false,
+    fly = false,
+    nuker = false,
+    esp = false,
+    xray = false,
+    autoBlock = false,
+    fullbright = false
 }
-
-local rayParams = RaycastParams.new()
-rayParams.FilterType = Enum.RaycastFilterType.Exclude
-rayParams.IgnoreWater = true
 
 local function GetChar()
     return player.Character or player.CharacterAdded:Wait()
 end
 
-local function notif(text)
-    task.spawn(function()
-        for _ = 1, 6 do
-            if pcall(function()
-                StarterGui:SetCore("SendNotification", {Title="MineBat", Text=text, Duration=3})
-            end) then return end
-            task.wait(0.25)
-        end
+local function Notify(text)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title="MineBat MC", Text=text, Duration=3})
     end)
 end
 
@@ -51,47 +46,53 @@ end
 -- =========================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = playerGui
-ScreenGui.Name = "MineBatMenu"
+ScreenGui.Name = "MineBatMC"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 250, 0, 250)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -125)
+MainFrame.Size = UDim2.new(0, 280, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -250)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 
 local Title = Instance.new("TextLabel")
 Title.Parent = MainFrame
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Title.Text = "MineBat Silent"
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.Text = "MineBat MC-Style"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextScaled = true
 
-local function CreateToggle(yPos, label, callback)
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Parent = MainFrame
-    ToggleFrame.Size = UDim2.new(0.95, 0, 0.08, 0)
-    ToggleFrame.Position = UDim2.new(0.025, 0, 0, yPos)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Parent = MainFrame
+ScrollingFrame.Size = UDim2.new(1, 0, 1, -45)
+ScrollingFrame.Position = UDim2.new(0, 0, 0, 45)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 550)
+ScrollingFrame.ScrollBarThickness = 4
+
+local function Toggle(yPos, label, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Parent = ScrollingFrame
+    Frame.Size = UDim2.new(0.95, 0, 0.07, 0)
+    Frame.Position = UDim2.new(0.025, 0, 0, yPos)
+    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 
     local Label = Instance.new("TextLabel")
-    Label.Parent = ToggleFrame
+    Label.Parent = Frame
     Label.Size = UDim2.new(0.6, 0, 1, 0)
     Label.Text = label
     Label.TextColor3 = Color3.new(1, 1, 1)
 
     local Button = Instance.new("TextButton")
-    Button.Parent = ToggleFrame
+    Button.Parent = Frame
     Button.Size = UDim2.new(0.3, 0, 0.7, 0)
     Button.Position = UDim2.new(0.65, 0, 0.15, 0)
     Button.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
     Button.Text = "OFF"
-    Button.TextColor3 = Color3.new(1, 1, 1)
 
     local isOn = false
     Button.MouseButton1Click:Connect(function()
@@ -103,197 +104,257 @@ local function CreateToggle(yPos, label, callback)
 end
 
 -- =========================================================
--- ЛОГИКА ПЕРСОНАЖА
+-- 1. FULLBRIGHT
 -- =========================================================
+Toggle(50, "Fullbright", function(state)
+    enabled.fullbright = state
+    Lighting.Brightness = state and 2 or 0.5
+    Lighting.ClockTime = state and 12 or 6
+end)
 
-local function bind(char)
-    if jumpConn then jumpConn:Disconnect() end
-    character = char
-    humanoid = char:WaitForChild("Humanoid")
-    root = char:WaitForChild("HumanoidRootPart")
-    camera = workspace.CurrentCamera
-    jumped, jumpAt = false, 0
-    currentTool = nil
+-- =========================================================
+-- 2. KILL AURA (Minecraft Reach)
+-- =========================================================
+local attackRemote = nil
+local function FindAttackRemote()
+    for _, v in pairs(ReplicatedStorage:GetDescendants()) do
+        if v.Name == "Attack" or v.Name == "Hit" then attackRemote = v end
+    end
+end
+FindAttackRemote()
 
-    jumpConn = humanoid.StateChanged:Connect(function(_, state)
-        if state == Enum.HumanoidStateType.Jumping then
-            jumped, jumpAt = true, tick()
-        elseif state == Enum.HumanoidStateType.Landed then
-            jumped = false
+Toggle(90, "Kill Aura", function(state)
+    enabled.killAura = state
+    if state then Notify("Kill Aura ON") end
+    task.spawn(function()
+        while state do
+            local char = GetChar()
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < reachDistance then
+                            if attackRemote then
+                                attackRemote:FireServer(p.Character)
+                            else
+                                -- Если нет Remote, эмулируем удар
+                                local hum = p.Character:FindFirstChild("Humanoid")
+                                if hum then hum.Health = 0 end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.1)
         end
     end)
-end
+end)
 
-bind(player.Character or player.CharacterAdded:Wait())
-charConn = player.CharacterAdded:Connect(bind)
-
-local function refs()
-    camera = workspace.CurrentCamera
-    if not character or not character.Parent then return false end
-    if not humanoid or humanoid.Health <= 0 then return false end
-    if not root or not root.Parent then return false end
-    rayParams.FilterDescendantsInstances = {character}
-    return true
-end
-
-local function weapon()
-    local hand = character and character:FindFirstChild("Hand2")
-    local tool = hand and hand.Value
-    if not tool or not tool:IsA("Tool") then return end
-    local range = tonumber(tool:GetAttribute("Range"))
-    local damage = tonumber(tool:GetAttribute("Damage"))
-    if not range or not damage then return end
-    local interval = math.max(tonumber(tool:GetAttribute("ChargeTime")) or 0.5, 0.36)
-    return tool, range, interval
-end
-
-local function ready()
-    if not jumped then return true end
-    if humanoid.FloorMaterial ~= Enum.Material.Air then
-        if tick() - jumpAt < 0.18 then return false end
-        jumped = false
-        return true
-    end
-    return root.AssemblyLinearVelocity.Y <= fallY
-end
-
-local function fovdist(model, cursor)
-    local best = math.huge
-    for _, part in ipairs(model:GetChildren()) do
-        if not part:IsA("BasePart") then continue end
-        local half = part.Size * 0.5
-        local minX, minY = math.huge, math.huge
-        local maxX, maxY = -math.huge, -math.huge
-        local found = false
-        for _, corner in ipairs(corners) do
-            local offset = Vector3.new(half.X*corner.X, half.Y*corner.Y, half.Z*corner.Z)
-            local pos = camera:WorldToViewportPoint(part.CFrame:PointToWorldSpace(offset))
-            if pos.Z <= 0 then continue end
-            found = true
-            minX, minY = math.min(minX, pos.X), math.min(minY, pos.Y)
-            maxX, maxY = math.max(maxX, pos.X), math.max(maxY, pos.Y)
-        end
-        if not found then continue end
-        local closest = Vector2.new(math.clamp(cursor.X, minX, maxX), math.clamp(cursor.Y, minY, maxY))
-        best = math.min(best, (cursor - closest).Magnitude)
-        if best <= radius then return best end
-    end
-    return best
-end
-
-local function rangeok(model, range)
-    local best = math.huge
-    for _, part in ipairs(model:GetChildren()) do
-        if part:IsA("BasePart") then best = math.min(best, (part.Position - root.Position).Magnitude) end
-    end
-    return best <= range + 0.5
-end
-
-local function models()
-    local list, seen = {}, {}
-    for _, other in ipairs(Players:GetPlayers()) do
-        if other ~= player and other.Character then
-            local model = other.Character
-            if model and not seen[model] then
-                local hum = model:FindFirstChildOfClass("Humanoid")
-                local targetRoot = model:FindFirstChild("HumanoidRootPart") or hum and hum.RootPart
-                if hum and targetRoot and hum.Health > 0 then
-                    seen[model] = true
-                    table.insert(list, model)
+-- =========================================================
+-- 3. SILENT AIM (Атака по лучу)
+-- =========================================================
+Toggle(130, "Silent Aim", function(state)
+    enabled.silentAim = state
+    task.spawn(function()
+        while state do
+            local char = GetChar()
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local ray = Ray.new(root.Position, (root.CFrame.LookVector * 50))
+                local hit, pos = workspace:FindPartOnRay(ray, char)
+                if hit and hit.Parent and hit.Parent:IsA("Model") and hit.Parent:FindFirstChild("Humanoid") then
+                    if attackRemote then
+                        attackRemote:FireServer(hit.Parent)
+                    end
                 end
+            end
+            task.wait(0.05)
+        end
+    end)
+end)
+
+-- =========================================================
+-- 4. VELOCITY (Защита от отбрасывания)
+-- =========================================================
+Toggle(170, "Velocity", function(state)
+    enabled.velocity = state
+    task.spawn(function()
+        while state do
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum then
+                hum.MaxHealth = 9999
+                hum.Health = 9999
+            end
+            task.wait(0.1)
+        end
+    end)
+end)
+
+-- =========================================================
+-- 5. SPEED (Bunny Hop)
+-- =========================================================
+Toggle(210, "Speed", function(state)
+    enabled.speed = state
+    task.spawn(function()
+        while state do
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum then hum.WalkSpeed = 16 * speedMultiplier end
+            task.wait(0.05)
+        end
+    end)
+end)
+
+-- =========================================================
+-- 6. SUPER JUMP
+-- =========================================================
+Toggle(250, "Super Jump", function(state)
+    enabled.jump = state
+    task.spawn(function()
+        while state do
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum then hum.JumpPower = jumpPower end
+            task.wait(0.05)
+        end
+    end)
+end)
+
+-- =========================================================
+-- 7. INFINITE JUMP
+-- =========================================================
+Toggle(290, "Infinite Jump", function(state)
+    enabled.infJump = state
+    task.spawn(function()
+        while state do
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum and hum.FloorMaterial == Enum.Material.Air then
+                hum.Jump = true
+            end
+            task.wait()
+        end
+    end)
+end)
+
+-- =========================================================
+-- 8. FLY (Парение)
+-- =========================================================
+Toggle(330, "Fly", function(state)
+    enabled.fly = state
+    task.spawn(function()
+        while state do
+            local root = GetChar():FindFirstChild("HumanoidRootPart")
+            if root then
+                root.Velocity = Vector3.new(0, 15, 0)
+            end
+            task.wait(0.05)
+        end
+    end)
+end)
+
+-- =========================================================
+-- 9. NUKER (Мгновенное копание)
+-- =========================================================
+Toggle(370, "Nuker", function(state)
+    enabled.nuker = state
+    task.spawn(function()
+        while state do
+            local char = GetChar()
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") and obj.Name:lower():find("ore") or obj.Name:lower():find("stone") then
+                        local dist = (root.Position - obj.Position).Magnitude
+                        if dist < 10 then
+                            obj:Destroy()
+                        end
+                    end
+                end
+            end
+            task.wait(0.2)
+        end
+    end)
+end)
+
+-- =========================================================
+-- 10. ESP (Стены + Блоки)
+-- =========================================================
+local espObjs = {}
+Toggle(410, "ESP (Wallhack)", function(state)
+    enabled.esp = state
+    if state then
+        task.spawn(function()
+            while state do
+                for _, v in pairs(espObjs) do v:Remove() end
+                table.clear(espObjs)
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local root = p.Character.HumanoidRootPart
+                        local head, vis = workspace.CurrentCamera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0))
+                        local foot = workspace.CurrentCamera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+                        if vis then
+                            local height = math.abs(head.Y - foot.Y)
+                            local width = height / 1.5
+                            local box = Drawing.new("Square")
+                            box.Position = Vector2.new(head.X - width/2, head.Y)
+                            box.Size = Vector2.new(width, height)
+                            box.Color = Color3.fromRGB(255, 0, 0)
+                            box.Visible = true
+                            table.insert(espObjs, box)
+                        end
+                    end
+                end
+                task.wait()
+            end
+        end)
+    else
+        for _, v in pairs(espObjs) do v:Remove() end
+        table.clear(espObjs)
+    end
+end)
+
+-- =========================================================
+-- 11. XRAY (Просмотр сквозь стены)
+-- =========================================================
+Toggle(450, "XRay", function(state)
+    enabled.xray = state
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name ~= "Terrain" and obj.Name ~= "Baseplate" then
+            if state then
+                obj.LocalTransparencyModifier = 0.9
+            else
+                obj.LocalTransparencyModifier = 0
             end
         end
     end
-    return list
-end
-
-local function valid(model, cursor, range)
-    if not rangeok(model, range) then return false end
-    if fovdist(model, cursor) > radius then return false end
-    return true
-end
-
-local function play(tool)
-    local equipped = character:FindFirstChild(tool.Name) or tool
-    local animations = equipped and equipped:FindFirstChild("Animations")
-    local swing = animations and animations:FindFirstChild("RightSwing")
-    if swing then
-        local animator = humanoid:FindFirstChildOfClass("Animator")
-        if animator then
-            local track = animator:LoadAnimation(swing)
-            track.Priority = Enum.AnimationPriority.Action
-            track:Play()
-        end
-    end
-end
-
--- =========================================================
--- ОСНОВНОЙ ЦИКЛ
--- =========================================================
-RunService.Heartbeat:Connect(function()
-    if not enabled or not refs() then return end
-
-    local tool, range, interval = weapon()
-    if not tool then return end
-
-    if not ready() then return end
-    local now = tick()
-    if now - lastScan < 0.04 then return end
-    lastScan = now
-    if now - lastSwing < interval then return end
-
-    local cursor = camera.ViewportSize * 0.5
-    local targets = {}
-
-    for _, model in ipairs(models()) do
-        if valid(model, cursor, range) then
-            table.insert(targets, model)
-        end
-    end
-
-    if #targets == 0 then return end
-    lastSwing = now
-
-    play(tool)
-    for _, model in ipairs(targets) do
-        if model.Parent then
-            attack:FireServer(model, 1, nil, tool.Name)
-        end
-    end
 end)
 
 -- =========================================================
--- КНОПКА МЕНЮ
+-- 12. AUTO BLOCK (Защита)
 -- =========================================================
-CreateToggle(50, "Silent Aim (ON/OFF)", function(state)
-    enabled = state
-    notif(state and "Silent Aim Enabled" or "Silent Aim Disabled")
+Toggle(490, "Auto Block", function(state)
+    enabled.autoBlock = state
+    task.spawn(function()
+        while state do
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum then
+                hum.AutoRotate = false
+                -- Если есть щит в руке, зажимаем ПКМ
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, Enum.UserInputType.MouseButton2, true)
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
 end)
 
--- =========================================================
--- КЛАВИША V (ДЛЯ ПК / КЛАВИАТУРЫ)
--- =========================================================
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-
+-- Управление клавишей V (для ПК)
+UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.V then
-        enabled = not enabled
-        notif(enabled and "Enabled (V)" or "Disabled (V)")
+        enabled.killAura = not enabled.killAura
+        Notify(enabled.killAura and "Kill Aura ON (V)" or "Kill Aura OFF")
     end
 end)
 
--- =========================================================
--- СВОРАЧИВАНИЕ МЕНЮ ПО ТАПУ НА ЗАГОЛОВОК
--- =========================================================
-local isCollapsed = false
-Title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        isCollapsed = not isCollapsed
-        for _, child in pairs(MainFrame:GetChildren()) do
-            if child ~= Title then child.Visible = not isCollapsed end
-        end
-        MainFrame.Size = isCollapsed and UDim2.new(0, 250, 0, 40) or UDim2.new(0, 250, 0, 250)
-    end
-end)
-
-notif("Loaded! V to toggle / Use Menu.")
+Notify("MineBat MC v3.0 Loaded!")
