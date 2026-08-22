@@ -1,5 +1,5 @@
 -- =========================================================
--- MINEBAT v6.0 (Тач + Постоянный Target Menu)
+-- MINEBAT v7.0 (Delta-Style + Target Menu + ESP)
 -- =========================================================
 
 local Players = game:GetService("Players")
@@ -16,7 +16,8 @@ local enabled = {
     killAura = false,
     spider = false,
     fakeBan = false,
-    aim = false
+    aim = false,
+    esp = false
 }
 
 local function GetChar()
@@ -30,7 +31,7 @@ local function Notify(text)
 end
 
 -- =========================================================
--- МЕНЮ (СТИЛЬ DELTA)
+-- МЕНЮ (Delta-Style, лёгкая прокрутка)
 -- =========================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
@@ -49,20 +50,27 @@ local Title = Instance.new("TextLabel")
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Title.Text = "MineBat v6.0"
+Title.Text = "MineBat v7.0"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextScaled = true
-Title.Font = Enum.Font.GothamBold
 
-local function CreateSection(xPos, sectionName)
-    local Frame = Instance.new("Frame")
-    Frame.Parent = MainFrame
-    Frame.Size = UDim2.new(0.23, 0, 1, -30)
-    Frame.Position = UDim2.new(xPos, 0, 0, 30)
-    Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Parent = MainFrame
+ScrollingFrame.Size = UDim2.new(1, 0, 1, -30)
+ScrollingFrame.Position = UDim2.new(0, 0, 0, 30)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 500)
+ScrollingFrame.ScrollBarThickness = 4
+
+local function CreateSection(xPos, sectionName, items)
+    local SectionFrame = Instance.new("Frame")
+    SectionFrame.Parent = ScrollingFrame
+    SectionFrame.Size = UDim2.new(0.23, 0, 0.15, 0)
+    SectionFrame.Position = UDim2.new(xPos, 0, 0, 0)
+    SectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 
     local Label = Instance.new("TextLabel")
-    Label.Parent = Frame
+    Label.Parent = SectionFrame
     Label.Size = UDim2.new(1, 0, 0, 30)
     Label.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     Label.Text = sectionName
@@ -71,7 +79,7 @@ local function CreateSection(xPos, sectionName)
 
     local function AddItem(yPos, itemLabel, callback)
         local ItemFrame = Instance.new("Frame")
-        ItemFrame.Parent = Frame
+        ItemFrame.Parent = SectionFrame
         ItemFrame.Size = UDim2.new(0.9, 0, 0.1, 0)
         ItemFrame.Position = UDim2.new(0.05, 0, 0, yPos)
         ItemFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -102,48 +110,10 @@ local function CreateSection(xPos, sectionName)
     return AddItem
 end
 
-local AddCombat = CreateSection(0.01, "Combat")
-local AddMovement = CreateSection(0.25, "Movement")
-local AddRender = CreateSection(0.50, "Render")
-local AddPlayer = CreateSection(0.75, "Player")
-
--- =========================================================
--- ПОСТОЯННЫЙ TARGET MENU
--- =========================================================
-local TargetGui = Instance.new("ScreenGui")
-TargetGui.Parent = player:WaitForChild("PlayerGui")
-TargetGui.Name = "TargetMenuGui"
-TargetGui.ResetOnSpawn = false
-
-local TargetFrame = Instance.new("Frame")
-TargetFrame.Parent = TargetGui
-TargetFrame.Size = UDim2.new(0, 100, 0, 45)
-TargetFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-TargetFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-TargetFrame.Visible = false
-
-local HeadImg = Instance.new("ImageLabel")
-HeadImg.Parent = TargetFrame
-HeadImg.Size = UDim2.new(0, 40, 0, 40)
-HeadImg.Position = UDim2.new(0, 2, 0, 2)
-HeadImg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-HeadImg.Image = ""
-
-local NameLabel = Instance.new("TextLabel")
-NameLabel.Parent = TargetFrame
-NameLabel.Size = UDim2.new(0, 40, 0, 20)
-NameLabel.Position = UDim2.new(0.5, 0, 0, 2)
-NameLabel.Text = ""
-NameLabel.TextColor3 = Color3.new(1, 1, 1)
-NameLabel.TextScaled = true
-
-local HpLabel = Instance.new("TextLabel")
-HpLabel.Parent = TargetFrame
-HpLabel.Size = UDim2.new(0, 40, 0, 20)
-HpLabel.Position = UDim2.new(0.5, 0, 0, 22)
-HpLabel.Text = ""
-HpLabel.TextColor3 = Color3.new(1, 1, 1)
-HpLabel.TextScaled = true
+local AddCombat = CreateSection(0.01, "Combat", {})
+local AddMovement = CreateSection(0.25, "Movement", {})
+local AddRender = CreateSection(0.50, "Render", {})
+local AddPlayer = CreateSection(0.75, "Player", {})
 
 -- =========================================================
 -- ФУНКЦИИ
@@ -171,7 +141,7 @@ local function Aimbot()
                 end
             end
             if nearest then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, nearest.Position)
+                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, nearest.Position)
             end
         end
     end
@@ -215,7 +185,7 @@ end
 
 RunService.Heartbeat:Connect(KillAura)
 
--- 3. СПАЙДЕР (без управляемости)
+-- 3. СПАЙДЕР
 AddMovement(10, "Spider", function(state)
     enabled.spider = state
     if state then Notify("Spider ON") end
@@ -238,26 +208,26 @@ end
 
 RunService.Heartbeat:Connect(Spider)
 
--- 4. ESP
+-- 4. ESP (Box + HP сбоку)
 AddRender(10, "ESP", function(state)
-    if state then
-        task.spawn(function()
-            while true do
-                for _, p in pairs(Players:GetPlayers()) do
-                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        if not p.Character:FindFirstChild("ESP_HL") then
-                            local hl = Instance.new("Highlight")
-                            hl.Name = "ESP_HL"
-                            hl.Parent = p.Character
-                            hl.FillColor = Color3.fromRGB(255, 0, 0)
-                            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                            hl.FillTransparency = 0.5
-                        end
-                    end
+    enabled.esp = state
+    if state then Notify("ESP ON") end
+end)
+
+local function ESP()
+    if enabled.esp then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                if not p.Character:FindFirstChild("ESP_HL") then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "ESP_HL"
+                    hl.Parent = p.Character
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
                 end
-                task.wait(0.1)
             end
-        end)
+        end
     else
         for _, p in pairs(Players:GetPlayers()) do
             if p.Character and p.Character:FindFirstChild("ESP_HL") then
@@ -266,6 +236,8 @@ AddRender(10, "ESP", function(state)
         end
     end
 end)
+
+RunService.Heartbeat:Connect(ESP)
 
 -- 5. FAKE BAN
 AddPlayer(10, "Fake Ban", function(state)
@@ -292,7 +264,64 @@ end
 RunService.Heartbeat:Connect(FakeBan)
 
 -- =========================================================
--- TARGET MENU (Постоянный)
+-- TARGET MENU (Постоянный, появляется при ударе)
+-- =========================================================
+local TargetGui = Instance.new("ScreenGui")
+TargetGui.Parent = player:WaitForChild("PlayerGui")
+TargetGui.Name = "TargetMenuGui"
+TargetGui.ResetOnSpawn = false
+
+local TargetFrame = Instance.new("Frame")
+TargetFrame.Parent = TargetGui
+TargetFrame.Size = UDim2.new(0, 100, 0, 45)
+TargetFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+TargetFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+TargetFrame.Visible = false
+
+local HeadImg = Instance.new("ImageLabel")
+HeadImg.Parent = TargetFrame
+HeadImg.Size = UDim2.new(0, 40, 0, 40)
+HeadImg.Position = UDim2.new(0, 2, 0, 2)
+HeadImg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HeadImg.Image = ""
+
+local NameLabel = Instance.new("TextLabel")
+NameLabel.Parent = TargetFrame
+NameLabel.Size = UDim2.new(0, 40, 0, 20)
+NameLabel.Position = UDim2.new(0.5, 0, 0, 2)
+NameLabel.Text = ""
+NameLabel.TextColor3 = Color3.new(1, 1, 1)
+NameLabel.TextScaled = true
+
+local HpLabel = Instance.new("TextLabel")
+HpLabel.Parent = TargetFrame
+HpLabel.Size = UDim2.new(0, 40, 0, 20)
+HpLabel.Position = UDim2.new(0.5, 0, 0, 22)
+HpLabel.Text = ""
+HpLabel.TextColor3 = Color3.new(1, 1, 1)
+HpLabel.TextScaled = true
+
+-- =========================================================
+-- TARGET MENU = ПОЯВЛЯЕТСЯ ПРИ УДАРЕ
+-- =========================================================
+local KickTimer = 0
+local FunctionKillAura = function(p)
+    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+        local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
+        if dist < 12 then
+            if remote then
+                remote:FireServer(p.Character)
+            end
+            if p.Character:FindFirstChild("Humanoid") then
+                p.Character.Humanoid.Health = 0
+            end
+            KickTimer = tick()
+        end
+    end
+end
+
+-- =========================================================
+-- TARGET MENU (Wyświetla się, gdy użytkownik jest wyzwany)
 -- =========================================================
 local function TargetMenu()
     if player.Character then
@@ -348,4 +377,4 @@ UserInputService.InputBegan:Connect(function(input)
     end
 end)
 
-print("MineBat v6.0 Loaded!")
+print("MineBat v7.0 Loaded!")
