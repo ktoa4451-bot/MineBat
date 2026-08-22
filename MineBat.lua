@@ -1,6 +1,7 @@
 -- =========================================================
--- MINEBAT v5.1 (Spider выключается чисто)
+-- MINEBAT v6.0 (Тач + Постоянный Target Menu)
 -- =========================================================
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,23 @@ local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local humanoid = char:FindFirstChild("Humanoid")
 local root = char:FindFirstChild("HumanoidRootPart")
+
+local enabled = {
+    killAura = false,
+    spider = false,
+    fakeBan = false,
+    aim = false
+}
+
+local function GetChar()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+local function Notify(text)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title="MineBat", Text=text, Duration=3})
+    end)
+end
 
 -- =========================================================
 -- МЕНЮ (СТИЛЬ DELTA)
@@ -31,7 +49,7 @@ local Title = Instance.new("TextLabel")
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Title.Text = "MineBat v5.1"
+Title.Text = "MineBat v6.0"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold
@@ -90,119 +108,137 @@ local AddRender = CreateSection(0.50, "Render")
 local AddPlayer = CreateSection(0.75, "Player")
 
 -- =========================================================
+-- ПОСТОЯННЫЙ TARGET MENU
+-- =========================================================
+local TargetGui = Instance.new("ScreenGui")
+TargetGui.Parent = player:WaitForChild("PlayerGui")
+TargetGui.Name = "TargetMenuGui"
+TargetGui.ResetOnSpawn = false
+
+local TargetFrame = Instance.new("Frame")
+TargetFrame.Parent = TargetGui
+TargetFrame.Size = UDim2.new(0, 100, 0, 45)
+TargetFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+TargetFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+TargetFrame.Visible = false
+
+local HeadImg = Instance.new("ImageLabel")
+HeadImg.Parent = TargetFrame
+HeadImg.Size = UDim2.new(0, 40, 0, 40)
+HeadImg.Position = UDim2.new(0, 2, 0, 2)
+HeadImg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HeadImg.Image = ""
+
+local NameLabel = Instance.new("TextLabel")
+NameLabel.Parent = TargetFrame
+NameLabel.Size = UDim2.new(0, 40, 0, 20)
+NameLabel.Position = UDim2.new(0.5, 0, 0, 2)
+NameLabel.Text = ""
+NameLabel.TextColor3 = Color3.new(1, 1, 1)
+NameLabel.TextScaled = true
+
+local HpLabel = Instance.new("TextLabel")
+HpLabel.Parent = TargetFrame
+HpLabel.Size = UDim2.new(0, 40, 0, 20)
+HpLabel.Position = UDim2.new(0.5, 0, 0, 22)
+HpLabel.Text = ""
+HpLabel.TextColor3 = Color3.new(1, 1, 1)
+HpLabel.TextScaled = true
+
+-- =========================================================
 -- ФУНКЦИИ
 -- =========================================================
 
 -- 1. АИМБОТ
 AddCombat(10, "Aimbot", function(state)
-    if state then
-        task.spawn(function()
-            while true do
-                if player.Character then
-                    local rootPos = player.Character:FindFirstChild("HumanoidRootPart")
-                    if rootPos then
-                        local nearest = nil
-                        local nearestDist = 120
-                        for _, p in pairs(Players:GetPlayers()) do
-                            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                                local dist = (rootPos.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                                if dist < nearestDist then
-                                    nearestDist = dist
-                                    nearest = p.Character.HumanoidRootPart
-                                end
-                            end
-                        end
-                        if nearest then
-                            workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, nearest.Position)
-                        end
-                    end
-                end
-                task.wait(0.1)
-            end
-        end)
-    end
+    enabled.aim = state
+    if state then Notify("Aimbot ON") end
 end)
 
--- 2. КИЛЛ АУРА (через Remote)
-AddCombat(30, "Kill Aura", function(state)
-    if state then
-        task.spawn(function()
-            while true do
-                if player.Character then
-                    local rootPos = player.Character:FindFirstChild("HumanoidRootPart")
-                    if rootPos then
-                        local remote = ReplicatedStorage:FindFirstChild("Attack", true)
-                        if remote then
-                            for _, p in pairs(Players:GetPlayers()) do
-                                if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                                    local dist = (rootPos.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                                    if dist < 12 then
-                                        remote:FireServer(p.Character)
-                                    end
-                                end
-                            end
-                        else
-                            for _, p in pairs(Players:GetPlayers()) do
-                                if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                                    local dist = (rootPos.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                                    if dist < 12 then
-                                        p.Character.Humanoid.Health = 0
-                                    end
-                                end
-                            end
-                        end
+local function Aimbot()
+    if enabled.aim then
+        local root = GetChar():FindFirstChild("HumanoidRootPart")
+        if root then
+            local nearest = nil
+            local nearestDist = 120
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        nearest = p.Character.HumanoidRootPart
                     end
                 end
-                task.wait(0.1)
             end
-        end)
-    end
-end)
-
--- 3. СПАЙДЕР (Карабканье по стенам + выключение)
-AddMovement(10, "Spider", function(state)
-    if state then
-        task.spawn(function()
-            while true do
-                if player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart") then
-                    local hum = player.Character.Humanoid
-                    local rootPos = player.Character.HumanoidRootPart
-                    
-                    -- Поиск ближайшей вертикальной стены
-                    local ray = Ray.new(rootPos.Position, rootPos.CFrame.LookVector * 5)
-                    local hit = workspace:FindPartOnRay(ray, player.Character)
-                    
-                    if hit then
-                        hum.WalkSpeed = 100
-                        hum.JumpPower = 0
-                        hum.UseJumpPower = false
-                        
-                        -- Когда близко к стене + нажимается прыжок, поднимаемся вверх
-                        if hum.FloorMaterial == Enum.Material.Air and hit then
-                            hum.Jump = true
-                            rootPos.Velocity = Vector3.new(0, 15, 0)
-                        end
-                    else
-                        hum.WalkSpeed = 16
-                        hum.JumpPower = 50
-                        hum.UseJumpPower = true
-                    end
-                end
-                task.wait(0.05)
+            if nearest then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, nearest.Position)
             end
-        end)
-    else
-        -- ОБРАТНО К НОРМЕ
-        local hum = player.Character:FindFirstChild("Humanoid")
-        if hum then
-            hum.WalkSpeed = 16
-            hum.JumpPower = 50
-            hum.UseJumpPower = true
         end
     end
+end
+
+RunService.RenderStepped:Connect(Aimbot)
+
+-- 2. КИЛЛ АУРА
+AddCombat(30, "Kill Aura", function(state)
+    enabled.killAura = state
+    if state then Notify("Kill Aura ON") end
 end)
 
--- 4. ESP (Highlight)
+local function KillAura()
+    if enabled.killAura then
+        local root = GetChar():FindFirstChild("HumanoidRootPart")
+        if root then
+            local remote = ReplicatedStorage:FindFirstChild("Attack", true)
+            if remote then
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < 12 then
+                            remote:FireServer(p.Character)
+                        end
+                    end
+                end
+            else
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < 12 then
+                            p.Character.Humanoid.Health = 0
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(KillAura)
+
+-- 3. СПАЙДЕР (без управляемости)
+AddMovement(10, "Spider", function(state)
+    enabled.spider = state
+    if state then Notify("Spider ON") end
+end)
+
+local function Spider()
+    if enabled.spider then
+        local root = GetChar():FindFirstChild("HumanoidRootPart")
+        if root then
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum then
+                hum.WalkSpeed = 100
+                hum.JumpPower = 0
+                hum.UseJumpPower = false
+            end
+            root.Velocity = Vector3.new(0, 10, 0)
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(Spider)
+
+-- 4. ESP
 AddRender(10, "ESP", function(state)
     if state then
         task.spawn(function()
@@ -231,91 +267,66 @@ AddRender(10, "ESP", function(state)
     end
 end)
 
--- 5. TARGET MENU (Голова + Ник + ХП)
-AddRender(30, "Target Menu", function(state)
-    if state then
-        task.spawn(function()
-            while true do
-                if player.Character then
-                    local rootPos = player.Character:FindFirstChild("HumanoidRootPart")
-                    if rootPos then
-                        local nearest = nil
-                        local nearestDist = 100
-                        for _, p in pairs(Players:GetPlayers()) do
-                            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                                local dist = (rootPos.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                                if dist < nearestDist then
-                                    nearestDist = dist
-                                    nearest = p
-                                end
-                            end
-                        end
-                        if nearest then
-                            local headPos = workspace.CurrentCamera:WorldToViewportPoint(nearest.Character.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
-                            local hp = nearest.Character:FindFirstChild("Humanoid")
-                            
-                            local cardFrame = Instance.new("Frame")
-                            cardFrame.Parent = playerGui
-                            cardFrame.Name = "TargetCard"
-                            cardFrame.Size = UDim2.new(0, 100, 0, 45)
-                            cardFrame.Position = UDim2.fromOffset(headPos.X - 50, headPos.Y - 22)
-                            cardFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-                            cardFrame.Visible = true
-                            
-                            local head = Instance.new("ImageLabel")
-                            head.Parent = cardFrame
-                            head.Size = UDim2.new(0, 40, 0, 40)
-                            head.Position = UDim2.new(0, 2, 0, 2)
-                            head.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                            head.Image = "rbxassetid://" .. nearest.UserId
-                            
-                            local nameLabel = Instance.new("TextLabel")
-                            nameLabel.Parent = cardFrame
-                            nameLabel.Size = UDim2.new(0, 40, 0, 20)
-                            nameLabel.Position = UDim2.new(0.5, 0, 0, 2)
-                            nameLabel.Text = nearest.Name
-                            nameLabel.TextColor3 = Color3.new(1, 1, 1)
-                            nameLabel.TextScaled = true
-                            
-                            local hpBar = Instance.new("TextLabel")
-                            hpBar.Parent = cardFrame
-                            hpBar.Size = UDim2.new(0, 40, 0, 20)
-                            hpBar.Position = UDim2.new(0.5, 0, 0, 22)
-                            hpBar.Text = "HP: " .. hp.Health
-                            hpBar.TextColor3 = Color3.new(1, 1, 1)
-                            hpBar.TextScaled = true
-                            
-                            cardFrame:Destroy()
-                        end
-                    end
-                end
-                task.wait(0.1)
-            end
-        end)
-    end
+-- 5. FAKE BAN
+AddPlayer(10, "Fake Ban", function(state)
+    enabled.fakeBan = state
+    if state then Notify("Fake Ban ON") end
 end)
 
--- 6. FAKE BAN
-AddPlayer(10, "Fake Ban", function(state)
-    if state then
-        task.spawn(function()
-            while true do
-                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    local rootPos = player.Character.HumanoidRootPart
-                    rootPos.Velocity = Vector3.new(0, 15, 0)
-                    task.wait(0.5)
-                    rootPos.Velocity = Vector3.new(0, 0, 0)
-                    task.wait(4)
-                    local hum = player.Character:FindFirstChild("Humanoid")
-                    if hum then
-                        hum.Health = 0
+local function FakeBan()
+    if enabled.fakeBan then
+        local root = GetChar():FindFirstChild("HumanoidRootPart")
+        if root then
+            root.Velocity = Vector3.new(0, 15, 0)
+            task.wait(0.5)
+            root.Velocity = Vector3.new(0, 0, 0)
+            task.wait(4)
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum then
+                hum.Health = 0
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(FakeBan)
+
+-- =========================================================
+-- TARGET MENU (Постоянный)
+-- =========================================================
+local function TargetMenu()
+    if player.Character then
+        local rootPos = player.Character:FindFirstChild("HumanoidRootPart")
+        if rootPos then
+            local nearest = nil
+            local nearestDist = 100
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (rootPos.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        nearest = p
                     end
                 end
-                task.wait(0.1)
             end
-        end)
+            if nearest then
+                local headPos = workspace.CurrentCamera:WorldToViewportPoint(nearest.Character.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
+                local hp = nearest.Character:FindFirstChild("Humanoid")
+                
+                TargetFrame.Position = UDim2.fromOffset(headPos.X - 50, headPos.Y - 22)
+                TargetFrame.Visible = true
+                
+                HeadImg.Image = "rbxassetid://" .. nearest.UserId
+                NameLabel.Text = nearest.Name
+                HpLabel.Text = "HP: " .. hp.Health
+            else
+                TargetFrame.Visible = false
+            end
+        end
     end
-end)
+end
+
+RunService.RenderStepped:Connect(TargetMenu)
 
 -- =========================================================
 -- Кнопка открытия/сворачивания
@@ -337,4 +348,4 @@ UserInputService.InputBegan:Connect(function(input)
     end
 end)
 
-print("MineBat v5.1 Loaded!")
+print("MineBat v6.0 Loaded!")
