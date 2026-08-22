@@ -1,5 +1,5 @@
 -- =========================================================
--- MINEBAT v3.0 (Spinner + Target Menu)
+-- MINEBAT v4.0 (Rage Menu + Спайдер + Target + Spinner + Fake Ban)
 -- =========================================================
 
 local Players = game:GetService("Players")
@@ -14,12 +14,11 @@ local humanoid = char:FindFirstChild("Humanoid")
 local root = char:FindFirstChild("HumanoidRootPart")
 
 local enabled = {
-    spider = false,
     killAura = false,
     spin = false,
     esp = false,
     aim = false,
-    aiAura = false,
+    spider = false,
     targetMenu = false,
     fakeBan = false
 }
@@ -35,7 +34,7 @@ local function Notify(text)
 end
 
 -- =========================================================
--- МЕНЮ (стиль Delta)
+-- МЕНЮ (Стиль Delta)
 -- =========================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
@@ -44,8 +43,8 @@ ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 250, 0, 350)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -175)
+MainFrame.Size = UDim2.new(0, 250, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -150)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.Active = true
 MainFrame.Draggable = true
@@ -141,7 +140,13 @@ local function KillAura()
                 if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
                     if dist < 10 then
-                        p.Character.Humanoid.Health = 0
+                        -- Урон через RemoteEvent
+                        local remote = ReplicatedStorage:FindFirstChild("Attack", true)
+                        if remote then
+                            remote:FireServer(p.Character)
+                        else
+                            p.Character.Humanoid.Health = 0
+                        end
                     end
                 end
             end
@@ -165,9 +170,8 @@ local function Spinner()
                 end
             end
             if nearest then
-                local spinSpeed = 5
                 root.CFrame = CFrame.new(root.Position, nearest.Position)
-                root.CFrame = root.CFrame * CFrame.Angles(0, spinSpeed * tick(), 0)
+                root.CFrame = root.CFrame * CFrame.Angles(0, 5 * tick(), 0)
             end
         end
     end
@@ -177,72 +181,42 @@ RunService.Heartbeat:Connect(KillAura)
 RunService.Heartbeat:Connect(Spinner)
 
 -- =========================================================
--- ESP
+-- ESP (Highlight)
 -- =========================================================
 Toggle(150, "ESP", function(state)
     enabled.esp = state
     if state then Notify("ESP ON") end
 end)
 
-local espObjs = {}
 local function ESP()
     if enabled.esp then
-        for _, v in pairs(espObjs) do v:Remove() end
-        table.clear(espObjs)
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local root = p.Character.HumanoidRootPart
-                local head, vis = Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0))
-                local foot = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-                if vis then
-                    local height = math.abs(head.Y - foot.Y)
-                    local width = height / 1.5
-                    local box = Drawing.new("Square")
-                    box.Position = Vector2.new(head.X - width/2, head.Y)
-                    box.Size = Vector2.new(width, height)
-                    box.Color = Color3.fromRGB(255, 0, 0)
-                    box.Thickness = 2
-                    box.Visible = true
-                    table.insert(espObjs, box)
+                if not p.Character:FindFirstChild("ESP_HL") then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "ESP_HL"
+                    hl.Parent = p.Character
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
                 end
             end
         end
-        task.wait()
-    end
-end
-
-RunService.RenderStepped:Connect(ESP)
-
--- =========================================================
--- AI AURA
--- =========================================================
-Toggle(190, "AI Aura", function(state)
-    enabled.aiAura = state
-    if state then Notify("AI Aura ON") end
-end)
-
-local function AiAura()
-    if enabled.aiAura then
-        local root = GetChar():FindFirstChild("HumanoidRootPart")
-        if root then
-            for _, model in pairs(workspace:GetChildren()) do
-                if model:IsA("Model") and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
-                    local dist = (root.Position - model.HumanoidRootPart.Position).Magnitude
-                    if dist < 10 then
-                        model.Humanoid.Health = 0
-                    end
-                end
+    else
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("ESP_HL") then
+                p.Character.ESP_HL:Destroy()
             end
         end
     end
 end
 
-RunService.Heartbeat:Connect(AiAura)
+RunService.Heartbeat:Connect(ESP)
 
 -- =========================================================
--- СПАЙДЕР
+-- СПАЙДЕР (Скалолазание)
 -- =========================================================
-Toggle(230, "Spider", function(state)
+Toggle(190, "Spider", function(state)
     enabled.spider = state
     if state then Notify("Spider ON") end
 end)
@@ -251,7 +225,13 @@ local function Spider()
     if enabled.spider then
         local root = GetChar():FindFirstChild("HumanoidRootPart")
         if root then
-            root.Velocity = Vector3.new(0, 5, 0)
+            local hum = GetChar():FindFirstChild("Humanoid")
+            if hum then
+                hum.WalkSpeed = 100
+                hum.JumpPower = 0
+                hum.UseJumpPower = false
+            end
+            root.Velocity = Vector3.new(0, 10, 0)
         end
     end
 end
@@ -259,9 +239,9 @@ end
 RunService.Heartbeat:Connect(Spider)
 
 -- =========================================================
--- TARGET MENU
+-- TARGET MENU (Вокруг прицела)
 -- =========================================================
-Toggle(270, "Target Menu", function(state)
+Toggle(230, "Target Menu", function(state)
     enabled.targetMenu = state
     if state then Notify("Target Menu ON") end
 end)
@@ -282,13 +262,13 @@ local function TargetMenu()
         if nearest then
             local headPos = Camera:WorldToViewportPoint(nearest.Character.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
             local hp = nearest.Character:FindFirstChild("Humanoid")
-            local hpLine = Drawing.new("Line")
-            hpLine.From = Vector2.new(headPos.X - 10, headPos.Y - 10)
-            hpLine.To = Vector2.new(headPos.X - 10, headPos.Y + 10)
-            hpLine.Color = Color3.fromRGB(0, 255, 0)
-            hpLine.Thickness = 3
-            hpLine.Visible = true
-            table.insert(espObjs, hpLine)
+            local hpBar = Drawing.new("Line")
+            hpBar.From = Vector2.new(headPos.X - 10, headPos.Y - 10)
+            hpBar.To = Vector2.new(headPos.X - 10, headPos.Y + 10)
+            hpBar.Color = Color3.fromRGB(0, 255, 0)
+            hpBar.Thickness = 3
+            hpBar.Visible = true
+            table.insert(espObjs, hpBar)
             
             local playerName = Drawing.new("Text")
             playerName.Text = nearest.Name
@@ -312,9 +292,9 @@ end
 RunService.RenderStepped:Connect(TargetMenu)
 
 -- =========================================================
--- FAKE BAN
+-- FAKE BAN (HW) (По-медленнее, через 5 секунд урон)
 -- =========================================================
-Toggle(300, "Fake Ban (HW)", function(state)
+Toggle(270, "Fake Ban (HW)", function(state)
     enabled.fakeBan = state
     if state then Notify("Fake Ban ON") end
 end)
@@ -323,9 +303,10 @@ local function FakeBan()
     if enabled.fakeBan then
         local root = GetChar():FindFirstChild("HumanoidRootPart")
         if root then
-            root.Velocity = Vector3.new(0, 30, 0)
-            task.wait(0.5)
+            root.Velocity = Vector3.new(0, 10, 0)
+            task.wait(0.2)
             root.Velocity = Vector3.new(0, 0, 0)
+            task.wait(4)
             pcall(function()
                 game:GetService("ReplicatedStorage").Remotes.Reset:FireServer()
             end)
@@ -336,7 +317,7 @@ end
 RunService.Heartbeat:Connect(FakeBan)
 
 -- =========================================================
--- Кнопка закрытия / раскрытия меню
+-- СВОРАЧИВАНИЕ МЕНЮ
 -- =========================================================
 local isCollapsed = false
 Title.InputBegan:Connect(function(input)
@@ -345,7 +326,7 @@ Title.InputBegan:Connect(function(input)
         for _, child in pairs(MainFrame:GetChildren()) do
             if child ~= Title then child.Visible = not isCollapsed end
         end
-        MainFrame.Size = isCollapsed and UDim2.new(0, 250, 0, 40) or UDim2.new(0, 250, 0, 350)
+        MainFrame.Size = isCollapsed and UDim2.new(0, 250, 0, 40) or UDim2.new(0, 250, 0, 300)
     end
 end)
 
@@ -355,4 +336,4 @@ UserInputService.InputBegan:Connect(function(input)
     end
 end)
 
-print("MineBat v3.0 Loaded!")
+print("MineBat v4.0 Loaded!")
